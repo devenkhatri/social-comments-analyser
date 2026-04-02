@@ -60,7 +60,7 @@ APIFY_API_TOKEN=apify_api_xxxxxxxxxxxxx
 # Apify Actor IDs — optional overrides for each platform's scraper actor
 # Defaults are pre-configured; only set these if you want to use a different actor
 # APIFY_ACTOR_INSTAGRAM=SbK00X0JYCPblD2wp
-# APIFY_ACTOR_YOUTUBE=C4ojP3lsPaQotPrz3
+# APIFY_ACTOR_YOUTUBE=mExYO4A2k9976zMfA
 # APIFY_ACTOR_TWITTER=m2yGezjjPmm4bOvax
 
 # OpenRouter API Key - get from https://openrouter.ai/keys

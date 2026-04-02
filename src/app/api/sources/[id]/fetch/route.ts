@@ -8,11 +8,17 @@ import { Platform, RawComment, Source } from '@/lib/types';
 
 export const maxDuration = 300; // Allow up to 5 min for Apify actor runs
 
-const ACTOR_IDS: Record<Platform, string> = {
+const DEFAULT_ACTOR_IDS: Record<Platform, string> = {
   instagram: 'apify~instagram-comment-scraper',
   youtube: 'scrapio~youtube-comments-scraper',
   twitter: 'datapilot~twitter-x-comment-scraper',
 };
+
+function getActorId(platform: Platform): string {
+  const fromEnv = process.env[`APIFY_ACTOR_${platform.toUpperCase()}`];
+  if (fromEnv?.trim()) return fromEnv.trim();
+  return DEFAULT_ACTOR_IDS[platform];
+}
 
 type NormalizerFn = (item: Record<string, unknown>) => RawComment | null;
 
@@ -50,7 +56,7 @@ export async function POST(
       return Response.json({ error: 'Source not found' }, { status: 404 });
     }
 
-    const actorId = ACTOR_IDS[source.platform];
+    const actorId = getActorId(source.platform);
     const input = INPUT_BUILDERS[source.platform](source.url);
     const normalizer = NORMALIZERS[source.platform];
 

@@ -1,7 +1,7 @@
 import { RawComment } from '@/lib/types';
 
 // Actor: scrapio/youtube-comments-scraper
-// Actor ID: C4ojP3lsPaQotPrz3
+// Actor ID: mExYO4A2k9976zMfA
 
 interface ApifyYouTubeComment {
   cid?: string;
