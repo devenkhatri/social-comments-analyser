@@ -5,11 +5,23 @@ import { buildTwitterInput, normalizeTwitterComment } from '@/lib/adapters/twitt
 
 const APIFY_BASE_URL = 'https://api.apify.com/v2';
 
-const ACTOR_IDS: Record<Platform, string> = {
+/** Default actor IDs — can be overridden via env vars. */
+const DEFAULT_ACTOR_IDS: Record<Platform, string> = {
   instagram: 'SbK00X0JYCPblD2wp',
   youtube: 'C4ojP3lsPaQotPrz3',
   twitter: 'm2yGezjjPmm4bOvax',
 };
+
+/**
+ * Resolve the Apify actor ID for a platform.
+ * Priority: APIFY_ACTOR_<PLATFORM> env var → hardcoded default.
+ */
+function getActorId(platform: Platform): string {
+  const envKey = `APIFY_ACTOR_${platform.toUpperCase()}`;
+  const fromEnv = process.env[envKey];
+  if (fromEnv?.trim()) return fromEnv.trim();
+  return DEFAULT_ACTOR_IDS[platform];
+}
 
 type NormalizerFn = (item: Record<string, unknown>) => RawComment | null;
 
@@ -55,7 +67,7 @@ export async function fetchCommentsFromApify(
   platform: Platform,
   apiToken: string
 ): Promise<RawComment[]> {
-  const actorId = ACTOR_IDS[platform];
+  const actorId = getActorId(platform);
   const input = INPUT_BUILDERS[platform](url);
   const normalizer = NORMALIZERS[platform];
 
