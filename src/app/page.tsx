@@ -6,9 +6,20 @@ import { SourcesPanel } from '@/components/SourcesPanel';
 import { CommentsTable } from '@/components/CommentsTable';
 import { AlertPanel } from '@/components/AlertPanel';
 import { StatsBar } from '@/components/StatsBar';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { CloseIcon, MenuIcon } from '@/components/icons';
 
 type Tab = 'comments' | 'alerts';
+
+function LogoMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="7" fill="var(--brand)" />
+      <path d="M8 15.5 C8 11, 10.5 8, 14 8 C17.5 8, 20 11, 20 14.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+      <circle cx="14" cy="19" r="2.2" fill="white" />
+    </svg>
+  );
+}
 
 export default function Dashboard() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -18,43 +29,57 @@ export default function Dashboard() {
   const [commentsRefreshKey, setCommentsRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>('comments');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unresolvedAlerts, setUnresolvedAlerts] = useState(0);
 
   const fetchSources = useCallback(async () => {
     try {
       const res = await fetch('/api/sources');
       if (res.ok) setSources(await res.json());
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, []);
 
   const fetchStats = useCallback(async () => {
     try {
       const res = await fetch('/api/stats');
       if (res.ok) setStats(await res.json());
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchAlertCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      if (res.ok) {
+        const data = await res.json();
+        setUnresolvedAlerts(data.filter((a: { resolved: boolean }) => !a.resolved).length);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [sourcesRes, statsRes] = await Promise.all([
+        const [sourcesRes, statsRes, alertsRes] = await Promise.all([
           fetch('/api/sources'),
           fetch('/api/stats'),
+          fetch('/api/alerts'),
         ]);
         if (!cancelled) {
           if (sourcesRes.ok) setSources(await sourcesRes.json());
           if (statsRes.ok) setStats(await statsRes.json());
+          if (alertsRes.ok) {
+            const alerts = await alertsRes.json();
+            setUnresolvedAlerts(alerts.filter((a: { resolved: boolean }) => !a.resolved).length);
+          }
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    fetchAlertCount();
+  }, [alertRefreshKey, fetchAlertCount]);
 
   function handleSourcesChanged() {
     fetchSources();
@@ -67,121 +92,188 @@ export default function Dashboard() {
     setAlertRefreshKey((k) => k + 1);
   }
 
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '0 14px',
+    height: 36,
+    fontSize: 13,
+    fontWeight: 500,
+    borderRadius: 'var(--r-md)',
+    border: 'none',
+    cursor: 'pointer',
+    transition: `background var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out)`,
+    background: active ? 'var(--brand-subtle)' : 'transparent',
+    color: active ? 'var(--brand-text)' : 'var(--t2)',
+    letterSpacing: '-0.01em',
+  });
+
   return (
-    <div className="min-h-screen" style={{ background: 'var(--surface-page)' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <header style={{ background: 'var(--surface-card)', borderBottom: '1px solid var(--border-default)' }} className="px-4 sm:px-6 py-4">
-        <div className="max-w-screen-2xl mx-auto flex items-center gap-4">
-          {/* Mobile menu button */}
+      <header style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        height: 'var(--header-h)',
+        background: 'var(--header-bg)',
+        borderBottom: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-xs)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          maxWidth: 1600,
+          margin: '0 auto',
+          padding: '0 20px',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+        }}>
+          {/* Mobile menu */}
           <button
+            className="lg:hidden"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden rounded p-2"
-            style={{ color: 'var(--text-secondary)' }}
             aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-            aria-expanded={sidebarOpen}
+            style={{
+              width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)',
+              color: 'var(--t2)',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
           >
-            {sidebarOpen ? (
-              <CloseIcon />
-            ) : (
-              <MenuIcon />
-            )}
+            {sidebarOpen ? <CloseIcon className="h-4 w-4" /> : <MenuIcon className="h-4 w-4" />}
           </button>
-          <h1 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Comment Monitor</h1>
-          <span className="text-xs sm:text-sm" style={{ color: 'var(--text-tertiary)' }}>powered by Apify + OpenRouter</span>
+
+          {/* Brand */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0, userSelect: 'none' }}>
+            <LogoMark />
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)', letterSpacing: '-0.02em' }}>
+              Comment Monitor
+            </span>
+          </div>
+
+          {/* Tabs — centered */}
+          <nav style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                onClick={() => setActiveTab('comments')}
+                style={tabStyle(activeTab === 'comments')}
+                aria-current={activeTab === 'comments' ? 'page' : undefined}
+              >
+                Feed
+              </button>
+              <button
+                onClick={() => setActiveTab('alerts')}
+                style={tabStyle(activeTab === 'alerts')}
+                aria-current={activeTab === 'alerts' ? 'page' : undefined}
+              >
+                Alerts
+                {unresolvedAlerts > 0 && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 5px',
+                    borderRadius: 'var(--r-full)',
+                    background: activeTab === 'alerts' ? 'var(--danger)' : 'var(--danger-muted)',
+                    color: activeTab === 'alerts' ? 'white' : 'var(--danger-text)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                  }}>
+                    {unresolvedAlerts > 99 ? '99+' : unresolvedAlerts}
+                  </span>
+                )}
+              </button>
+            </div>
+          </nav>
+
+          {/* Right actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--t4)', letterSpacing: '0.01em' }} className="hidden sm:block">
+              Apify · OpenRouter
+            </span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      {/* Sidebar overlay on mobile */}
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: 'oklch(0% 0 0 / 0.45)' }}
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
-        {/* Stats */}
-        <StatsBar stats={stats} />
-
-        {/* Main layout */}
-        <div className="flex flex-col lg:flex-row gap-6 mt-6">
-          {/* Sidebar: Sources */}
-          <aside
-            className={`
-              fixed lg:static inset-y-0 left-0 z-50 w-72
-              transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
-              lg:transform-none lg:w-72 lg:shrink-0 lg:z-auto
-              ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-              pt-20 lg:pt-0 px-4 lg:px-0
-            `}
-            style={{
-              background: 'var(--surface-card)',
-              borderRight: '1px solid var(--border-default)',
-              boxShadow: sidebarOpen ? 'var(--shadow-lg)' : 'none',
-            }}
-            aria-label="Sources sidebar"
-          >
+      {/* Body */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <aside
+          className={`
+            fixed lg:static inset-y-0 left-0 z-50
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)]
+            lg:transition-none
+          `}
+          style={{
+            width: 'var(--sidebar-w)',
+            background: 'var(--sidebar-bg)',
+            borderRight: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            overflowY: 'auto',
+            paddingTop: 'var(--header-h)',
+          }}
+          aria-label="Sources sidebar"
+        >
+          <div style={{ padding: '20px 16px', flex: 1 }}>
             <SourcesPanel
               sources={sources}
               selectedSourceId={selectedSourceId}
               onSelectSource={setSelectedSourceId}
               onSourcesChanged={handleSourcesChanged}
             />
-          </aside>
+          </div>
+        </aside>
 
-          {/* Content area */}
-          <div className="flex-1 min-w-0">
-            {/* Tabs */}
-            <div role="tablist" className="flex border-b mb-4" style={{ borderColor: 'var(--border-default)' }}>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'comments'}
-                aria-controls="panel-comments"
-                id="tab-comments"
-                tabIndex={activeTab === 'comments' ? 0 : -1}
-                onClick={() => setActiveTab('comments')}
-                className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-                style={{
-                  borderColor: activeTab === 'comments' ? 'var(--color-brand-600)' : 'transparent',
-                  color: activeTab === 'comments' ? 'var(--color-brand-600)' : 'var(--text-secondary)',
-                }}
-              >
-                Comments
-              </button>
-              <button
-                role="tab"
-                aria-selected={activeTab === 'alerts'}
-                aria-controls="panel-alerts"
-                id="tab-alerts"
-                tabIndex={activeTab === 'alerts' ? 0 : -1}
-                onClick={() => setActiveTab('alerts')}
-                className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-                style={{
-                  borderColor: activeTab === 'alerts' ? 'var(--color-brand-600)' : 'transparent',
-                  color: activeTab === 'alerts' ? 'var(--color-brand-600)' : 'var(--text-secondary)',
-                }}
-              >
-                Alerts
-              </button>
+        {/* Main */}
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          {/* Stats strip */}
+          <div style={{
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface)',
+            flexShrink: 0,
+          }}>
+            <div style={{ maxWidth: 1340, margin: '0 auto', padding: '0 24px' }}>
+              <StatsBar stats={stats} />
             </div>
+          </div>
 
-            {/* Tab content */}
+          {/* Content */}
+          <div style={{ flex: 1, maxWidth: 1340, margin: '0 auto', width: '100%', padding: '24px' }}>
             {activeTab === 'comments' ? (
-              <div role="tabpanel" id="panel-comments" aria-labelledby="tab-comments">
-                <CommentsTable
-                  key={commentsRefreshKey}
-                  sourceId={selectedSourceId}
-                  onAnalyzeRequest={handleAnalyzeDone}
-                />
-              </div>
+              <CommentsTable
+                key={commentsRefreshKey}
+                sourceId={selectedSourceId}
+                onAnalyzeRequest={handleAnalyzeDone}
+              />
             ) : (
-              <div role="tabpanel" id="panel-alerts" aria-labelledby="tab-alerts">
-                <AlertPanel refreshKey={alertRefreshKey} />
-              </div>
+              <AlertPanel refreshKey={alertRefreshKey} />
             )}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

@@ -12,6 +12,43 @@ interface SourcesPanelProps {
   onSourcesChanged: () => void;
 }
 
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+function truncateUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/$/, '');
+    return (u.hostname + path).slice(0, 32) + ((u.hostname + path).length > 32 ? '\u2026' : '');
+  } catch {
+    return url.slice(0, 32) + (url.length > 32 ? '\u2026' : '');
+  }
+}
+
+const INPUT_STYLE: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 10px',
+  fontSize: 13,
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--t1)',
+  outline: 'none',
+  transition: `border-color var(--dur-base) var(--ease-out)`,
+  lineHeight: 1.4,
+};
+
 export function SourcesPanel({
   sources,
   selectedSourceId,
@@ -60,19 +97,13 @@ export function SourcesPanel({
     }
   }
 
-  async function handleDelete(id: number) {
-    setDeletingId(id);
-  }
-
   async function confirmDelete() {
     if (deletingId === null) return;
     try {
       await fetch(`/api/sources/${deletingId}`, { method: 'DELETE' });
       if (selectedSourceId === deletingId) onSelectSource(null);
       onSourcesChanged();
-    } catch {
-      // ignore
-    } finally {
+    } catch { /* ignore */ } finally {
       setDeletingId(null);
     }
   }
@@ -96,149 +127,219 @@ export function SourcesPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Sources</h2>
-
-      {/* Add source form */}
-      <form onSubmit={handleAdd} className="flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="source-url" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-            Social media URL
-          </label>
-          <input
-            id="source-url"
-            type="url"
-            placeholder="https://instagram.com/p/... or youtube.com/watch?v=..."
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            required
-            className="w-full rounded px-3 py-2 text-sm"
-            style={{
-              border: '1px solid var(--border-default)',
-              background: 'var(--surface-card)',
-              color: 'var(--text-primary)',
-            }}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="source-label" className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-            Label <span style={{ color: 'var(--text-tertiary)' }}>(optional)</span>
-          </label>
-          <input
-            id="source-label"
-            type="text"
-            placeholder="e.g., Competitor page"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            className="w-full rounded px-3 py-2 text-sm"
-            style={{
-              border: '1px solid var(--border-default)',
-              background: 'var(--surface-card)',
-              color: 'var(--text-primary)',
-            }}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={adding}
-          className="rounded px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
-          style={{ background: 'var(--color-brand-600)' }}
-        >
-          {adding ? 'Adding\u2026' : 'Add Source'}
-        </button>
-      </form>
-
-      {error && (
-        <p
-          className="rounded px-3 py-2 text-sm"
-          style={{ background: 'var(--color-danger-50)', color: 'var(--color-danger-700)' }}
-          role="alert"
-        >
-          {error}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
+      {/* Section: Add source */}
+      <div>
+        <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+          Add Source
         </p>
-      )}
-
-      {/* Source list */}
-      <ul className="flex flex-col gap-2" aria-label="Sources">
-        {sources.length === 0 && (
-          <li className="text-sm italic" style={{ color: 'var(--text-tertiary)' }}>No sources yet. Add one above.</li>
-        )}
-        {sources.map((source) => (
-          <li
-            key={source.id}
-            className={`rounded-lg p-3 cursor-pointer transition-colors`}
+        <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <label htmlFor="source-url" style={{ fontSize: 11, fontWeight: 500, color: 'var(--t2)' }}>
+              URL
+            </label>
+            <input
+              id="source-url"
+              type="url"
+              placeholder="youtube.com/watch?v=..."
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              required
+              style={INPUT_STYLE}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <label htmlFor="source-label" style={{ fontSize: 11, fontWeight: 500, color: 'var(--t2)' }}>
+              Label <span style={{ color: 'var(--t4)', fontWeight: 400 }}>(optional)</span>
+            </label>
+            <input
+              id="source-label"
+              type="text"
+              placeholder="e.g. Brand campaign video"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              style={INPUT_STYLE}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={adding}
             style={{
-              border: `1px solid ${selectedSourceId === source.id ? 'var(--color-brand-300)' : 'var(--border-default)'}`,
-              background: selectedSourceId === source.id ? 'var(--color-brand-50)' : 'var(--surface-card)',
+              padding: '8px 14px',
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: 'var(--r-md)',
+              border: 'none',
+              background: 'var(--brand)',
+              color: 'var(--t-brand)',
+              cursor: adding ? 'not-allowed' : 'pointer',
+              opacity: adding ? 0.6 : 1,
+              transition: `opacity var(--dur-base), background var(--dur-base)`,
+              letterSpacing: '-0.01em',
             }}
-            onClick={() =>
-              onSelectSource(selectedSourceId === source.id ? null : source.id)
-            }
-            role="button"
-            tabIndex={0}
-            aria-pressed={selectedSourceId === source.id}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onSelectSource(selectedSourceId === source.id ? null : source.id);
-              }
+            onMouseEnter={e => { if (!adding) (e.currentTarget as HTMLButtonElement).style.background = 'var(--brand-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--brand)'; }}
+          >
+            {adding ? 'Adding\u2026' : '+ Add Source'}
+          </button>
+        </form>
+
+        {error && (
+          <div
+            role="alert"
+            style={{
+              marginTop: 8,
+              padding: '8px 10px',
+              borderRadius: 'var(--r-md)',
+              background: 'var(--danger-subtle)',
+              border: '1px solid var(--danger-border)',
+              color: 'var(--danger-text)',
+              fontSize: 12,
             }}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex flex-col gap-1 min-w-0">
-                <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                  {source.label || source.url}
-                </span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <PlatformBadge platform={source.platform} />
-                  {source.last_fetched_at && (
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      Fetched {new Date(source.last_fetched_at).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFetch(source.id);
-                  }}
-                  disabled={fetchingId === source.id}
-                  title="Fetch new comments"
-                  aria-label={`Fetch new comments for ${source.label || source.url}`}
-                  className="rounded p-2.5 transition-colors disabled:opacity-40"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {fetchingId === source.id ? (
-                    <SpinnerIcon />
-                  ) : (
-                    <RefreshIcon />
-                  )}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(source.id);
-                  }}
-                  title="Delete source"
-                  aria-label={`Delete ${source.label || source.url}`}
-                  className="rounded p-2.5 transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+            {error}
+          </div>
+        )}
+      </div>
 
-      {/* In-app confirmation dialog */}
+      {/* Divider */}
+      <div style={{ height: 1, background: 'var(--border)' }} />
+
+      {/* Section: Sources list */}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+          Sources {sources.length > 0 && `(${sources.length})`}
+        </p>
+
+        {sources.length === 0 ? (
+          <div style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            border: '1px dashed var(--border)',
+            borderRadius: 'var(--r-lg)',
+          }}>
+            <p style={{ fontSize: 12, color: 'var(--t3)', lineHeight: 1.5 }}>
+              No sources yet.<br />Add one above to get started.
+            </p>
+          </div>
+        ) : (
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="Sources">
+            {sources.map((source) => {
+              const isSelected = selectedSourceId === source.id;
+              return (
+                <li
+                  key={source.id}
+                  className="group"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 10px',
+                    borderRadius: 'var(--r-md)',
+                    cursor: 'pointer',
+                    background: isSelected ? 'var(--brand-subtle)' : 'transparent',
+                    border: `1px solid ${isSelected ? 'var(--brand-muted)' : 'transparent'}`,
+                    transition: `background var(--dur-fast), border-color var(--dur-fast)`,
+                  }}
+                  onClick={() => onSelectSource(isSelected ? null : source.id)}
+                  onMouseEnter={e => {
+                    if (!isSelected) (e.currentTarget as HTMLLIElement).style.background = 'var(--surface)';
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected) (e.currentTarget as HTMLLIElement).style.background = 'transparent';
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectSource(isSelected ? null : source.id);
+                    }
+                  }}
+                >
+                  {/* Platform dot */}
+                  <PlatformBadge platform={source.platform} dotOnly />
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: isSelected ? 'var(--brand-text)' : 'var(--t1)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {source.label || truncateUrl(source.url)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 1 }}>
+                      {source.last_fetched_at
+                        ? `Synced ${formatRelativeDate(source.last_fetched_at)}`
+                        : 'Not synced'}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleFetch(source.id); }}
+                      disabled={fetchingId === source.id}
+                      title="Sync comments"
+                      aria-label={`Sync ${source.label || source.url}`}
+                      style={{
+                        width: 26, height: 26,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 'var(--r-sm)',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--t3)',
+                        cursor: fetchingId === source.id ? 'not-allowed' : 'pointer',
+                        opacity: fetchingId === source.id ? 0.5 : 1,
+                        transition: 'color var(--dur-fast), background var(--dur-fast)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t1)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t3)'; }}
+                    >
+                      {fetchingId === source.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeletingId(source.id); }}
+                      title="Delete source"
+                      aria-label={`Delete ${source.label || source.url}`}
+                      style={{
+                        width: 26, height: 26,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 'var(--r-sm)',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--t3)',
+                        cursor: 'pointer',
+                        transition: 'color var(--dur-fast), background var(--dur-fast)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-subtle)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger-text)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t3)'; }}
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Delete confirmation */}
       {deletingId !== null && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/40"
+            className="fixed inset-0 z-50"
+            style={{ background: 'oklch(0% 0 0 / 0.45)' }}
             onClick={() => setDeletingId(null)}
             aria-hidden="true"
           />
@@ -247,28 +348,52 @@ export function SourcesPanel({
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
             aria-describedby="confirm-delete-desc"
-            className="fixed inset-x-4 top-[50%] z-50 mx-auto max-w-sm -translate-y-[50%] rounded-lg p-6"
-            style={{ background: 'var(--surface-card)', border: '1px solid var(--border-default)', boxShadow: 'var(--shadow-lg)' }}
+            className="fixed inset-x-4 z-50 mx-auto max-w-xs"
+            style={{
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              boxShadow: 'var(--shadow-lg)',
+              padding: 20,
+            }}
           >
-            <h3 id="confirm-delete-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <h3 id="confirm-delete-title" style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)', marginBottom: 6 }}>
               Delete source?
             </h3>
-            <p id="confirm-delete-desc" className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              This will permanently remove this source and all its comments.
+            <p id="confirm-delete-desc" style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.5 }}>
+              This permanently removes this source and all its comments.
             </p>
-            <div className="mt-4 flex justify-end gap-2">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button
                 onClick={() => setDeletingId(null)}
-                className="rounded px-4 py-2 text-sm font-medium transition-colors"
-                style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}
+                style={{
+                  padding: '7px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--t2)',
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="rounded px-4 py-2 text-sm font-medium text-white transition-colors"
-                style={{ background: 'var(--color-danger-600)' }}
                 autoFocus
+                style={{
+                  padding: '7px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 'var(--r-md)',
+                  border: 'none',
+                  background: 'var(--danger)',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
               >
                 Delete
               </button>

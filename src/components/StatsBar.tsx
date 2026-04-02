@@ -2,63 +2,123 @@
 
 import { StatsData } from '@/lib/types';
 
-interface StatCardProps {
+function Metric({
+  label,
+  value,
+  valueColor,
+  sub,
+}: {
   label: string;
-  value: number | string;
-  color?: string;
+  value: string | number;
+  valueColor?: string;
+  sub?: string;
+}) {
+  return (
+    <div style={{
+      flex: 1,
+      padding: '14px 20px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      minWidth: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+        <span style={{
+          fontSize: 22,
+          fontWeight: 600,
+          letterSpacing: '-0.03em',
+          color: valueColor ?? 'var(--t1)',
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1,
+        }}>
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </span>
+        {sub && (
+          <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 500 }}>{sub}</span>
+        )}
+      </div>
+      <span style={{
+        fontSize: 10,
+        fontWeight: 600,
+        color: 'var(--t3)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em',
+        lineHeight: 1,
+      }}>
+        {label}
+      </span>
+    </div>
+  );
 }
 
-function StatCard({ label, value, color = 'var(--text-primary)' }: StatCardProps) {
+function Divider() {
   return (
-    <div className="rounded-lg p-4 flex flex-col gap-1" style={{ background: 'var(--surface-card)', border: '1px solid var(--border-default)' }}>
-      <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>{label}</span>
-      <span className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</span>
-    </div>
+    <div style={{
+      width: 1,
+      alignSelf: 'stretch',
+      background: 'var(--border)',
+      flexShrink: 0,
+      margin: '8px 0',
+    }} />
   );
 }
 
 export function StatsBar({ stats }: { stats: StatsData | null }) {
   if (!stats) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse" aria-label="Loading statistics">
+      <div style={{ display: 'flex', height: 64 }} aria-label="Loading statistics">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-20 rounded-lg" style={{ background: 'var(--surface-muted)' }} />
+          <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 20px' }}>
+            <div style={{
+              width: '80%', height: 20, borderRadius: 'var(--r-sm)',
+              background: 'var(--surface-2)',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }} />
+          </div>
         ))}
       </div>
     );
   }
 
-  const attentionPct =
-    stats.total > 0 ? Math.round((stats.needs_attention / stats.total) * 100) : 0;
+  const attentionPct = stats.total > 0 ? Math.round((stats.needs_attention / stats.total) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <StatCard label="Total Comments" value={stats.total.toLocaleString()} />
-      <StatCard
-        label="Needs Attention"
-        value={`${stats.needs_attention.toLocaleString()} (${attentionPct}%)`}
-        color={stats.needs_attention > 0 ? 'var(--color-warning-600)' : 'var(--text-primary)'}
+    <div style={{ display: 'flex', alignItems: 'stretch' }}>
+      <Metric label="Total Comments" value={stats.total} />
+      <Divider />
+      <Metric
+        label="Need Attention"
+        value={stats.needs_attention}
+        valueColor={stats.needs_attention > 0 ? 'var(--warning-text)' : undefined}
+        sub={stats.total > 0 ? `${attentionPct}%` : undefined}
       />
-      <StatCard
+      <Divider />
+      <Metric
         label="Critical"
-        value={stats.critical.toLocaleString()}
-        color={stats.critical > 0 ? 'var(--color-danger-600)' : 'var(--text-primary)'}
+        value={stats.critical}
+        valueColor={stats.critical > 0 ? 'var(--danger-text)' : undefined}
       />
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ background: 'var(--surface-card)', border: '1px solid var(--border-default)' }}>
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
-          Sentiment split
-        </span>
-        <div className="flex items-end gap-3 mt-auto">
-          <span className="text-sm font-medium" style={{ color: 'var(--color-success-600)' }}>
-            {stats.by_sentiment.positive} <span className="font-normal text-xs" style={{ color: 'var(--text-tertiary)' }}>positive</span>
+      <Divider />
+      <div style={{ flex: 1, padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--success-text)', fontVariantNumeric: 'tabular-nums' }}>
+            {stats.by_sentiment.positive.toLocaleString()}
+            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--t3)', marginLeft: 3 }}>pos</span>
           </span>
-          <span className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>
-            {stats.by_sentiment.neutral} <span className="font-normal text-xs">neutral</span>
+          <span style={{ fontSize: 11, color: 'var(--border-strong)' }}>·</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)', fontVariantNumeric: 'tabular-nums' }}>
+            {stats.by_sentiment.neutral.toLocaleString()}
+            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--t3)', marginLeft: 3 }}>neu</span>
           </span>
-          <span className="text-sm font-medium" style={{ color: 'var(--color-danger-600)' }}>
-            {stats.by_sentiment.negative} <span className="font-normal text-xs" style={{ color: 'var(--text-tertiary)' }}>negative</span>
+          <span style={{ fontSize: 11, color: 'var(--border-strong)' }}>·</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger-text)', fontVariantNumeric: 'tabular-nums' }}>
+            {stats.by_sentiment.negative.toLocaleString()}
+            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--t3)', marginLeft: 3 }}>neg</span>
           </span>
         </div>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.07em', lineHeight: 1 }}>
+          Sentiment
+        </span>
       </div>
     </div>
   );

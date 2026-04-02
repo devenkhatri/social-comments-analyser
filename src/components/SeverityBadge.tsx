@@ -3,9 +3,9 @@
 import { Severity } from '@/lib/types';
 
 const CONFIG: Record<Severity, { label: string; bg: string; text: string }> = {
-  low: { label: 'Low', bg: 'oklch(95% 0.03 90)', text: 'oklch(45% 0.08 90)' },
-  medium: { label: 'Medium', bg: 'var(--color-warning-100)', text: 'var(--color-warning-700)' },
-  high: { label: 'High', bg: 'var(--color-danger-100)', text: 'var(--color-danger-700)' },
+  low:    { label: 'Low',    bg: 'var(--surface-2)',     text: 'var(--t2)'         },
+  medium: { label: 'Medium', bg: 'var(--warning-muted)', text: 'var(--warning-text)' },
+  high:   { label: 'High',   bg: 'var(--danger-muted)',  text: 'var(--danger-text)'  },
 };
 
 export function SeverityBadge({ severity }: { severity: Severity | null }) {
@@ -13,8 +13,18 @@ export function SeverityBadge({ severity }: { severity: Severity | null }) {
   const config = CONFIG[severity];
   return (
     <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-      style={{ background: config.bg, color: config.text }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 7px',
+        borderRadius: 'var(--r-sm)',
+        background: config.bg,
+        color: config.text,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: '0.01em',
+        whiteSpace: 'nowrap',
+      }}
     >
       {config.label}
     </span>

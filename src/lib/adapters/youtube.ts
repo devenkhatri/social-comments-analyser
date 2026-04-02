@@ -38,7 +38,8 @@ export function buildYouTubeInput(url: string | string[]): Record<string, unknow
 /**
  * Normalize a raw Apify YouTube actor dataset item into our common RawComment shape.
  */
-export function normalizeYouTubeComment(item: ApifyYouTubeComment): RawComment | null {
+export function normalizeYouTubeComment(raw: ApifyYouTubeComment | Record<string, unknown>): RawComment | null {
+  const item = raw as ApifyYouTubeComment;
   const text = item.content?.trim();
   if (!text) return null;
 
