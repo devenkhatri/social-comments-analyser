@@ -47,15 +47,15 @@ export async function POST() {
       switch (source.platform) {
         case "instagram":
           input = buildInstagramInput(source.url);
-          normalizeFn = normalizeInstagramComment;
+          normalizeFn = normalizeInstagramComment as unknown as typeof normalizeFn;
           break;
         case "youtube":
           input = buildYouTubeInput(source.url);
-          normalizeFn = normalizeYouTubeComment;
+          normalizeFn = normalizeYouTubeComment as unknown as typeof normalizeFn;
           break;
         case "twitter":
           input = buildTwitterInput(source.url);
-          normalizeFn = normalizeTwitterComment;
+          normalizeFn = normalizeTwitterComment as unknown as typeof normalizeFn;
           break;
         default:
           continue;

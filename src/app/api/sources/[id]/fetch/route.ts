@@ -28,7 +28,7 @@ const NORMALIZERS: Record<Platform, NormalizerFn> = {
   twitter: (item) => normalizeTwitterComment(item as never),
 };
 
-const INPUT_BUILDERS: Record<Platform, (url: string) => Record<string, unknown>> = {
+const INPUT_BUILDERS: Record<Platform, (url: string | string[]) => Record<string, unknown>> = {
   instagram: buildInstagramInput,
   youtube: buildYouTubeInput,
   twitter: buildTwitterInput,

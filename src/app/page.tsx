@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [alertRefreshKey, setAlertRefreshKey] = useState(0);
+  const [commentsRefreshKey, setCommentsRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>('comments');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -58,7 +59,7 @@ export default function Dashboard() {
   function handleSourcesChanged() {
     fetchSources();
     fetchStats();
-    setAlertRefreshKey((k) => k + 1);
+    setCommentsRefreshKey((k) => k + 1);
   }
 
   function handleAnalyzeDone() {
@@ -169,6 +170,7 @@ export default function Dashboard() {
             {activeTab === 'comments' ? (
               <div role="tabpanel" id="panel-comments" aria-labelledby="tab-comments">
                 <CommentsTable
+                  key={commentsRefreshKey}
                   sourceId={selectedSourceId}
                   onAnalyzeRequest={handleAnalyzeDone}
                 />

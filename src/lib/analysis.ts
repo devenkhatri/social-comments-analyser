@@ -65,10 +65,15 @@ export async function analyzeComment(
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter error (${response.status})`);
+    const errorBody = await response.text();
+    throw new Error(`OpenRouter error (${response.status}): ${errorBody}`);
   }
 
   const data = await response.json();
+  if (data.error) {
+    throw new Error(`OpenRouter API error: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+
   const content: string = data?.choices?.[0]?.message?.content ?? "";
 
   try {
@@ -87,9 +92,11 @@ export async function analyzeBatch(
   comments: Array<{ id: number; text: string }>,
   apiKey: string,
   model: string,
-  concurrency = 3
+  concurrency = 3,
+  onProgress?: (processed: number) => void
 ): Promise<Array<{ id: number; result: AnalysisResult }>> {
   const results: Array<{ id: number; result: AnalysisResult }> = [];
+  let processed = 0;
 
   for (let i = 0; i < comments.length; i += concurrency) {
     const chunk = comments.slice(i, i + concurrency);
@@ -106,6 +113,8 @@ export async function analyzeBatch(
         results.push({ id: single.id, result: defaultResult });
       }
     }
+    processed += chunk.length;
+    onProgress?.(processed);
   }
 
   return results;
@@ -137,10 +146,14 @@ async function analyzeBatchTogether(
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter error (${response.status})`);
+      const errorBody = await response.text();
+      throw new Error(`OpenRouter error (${response.status}): ${errorBody}`);
     }
 
     const data = await response.json();
+    if (data.error) {
+      throw new Error(`OpenRouter API error: ${data.error.message || JSON.stringify(data.error)}`);
+    }
     const content: string = data?.choices?.[0]?.message?.content ?? "";
     const cleaned = content
       .replace(/^```(?:json)?\s*/i, "")

@@ -18,6 +18,14 @@ interface CommentsTableProps {
   onAnalyzeRequest?: () => void;
 }
 
+interface AnalysisProgress {
+  done: number;
+  total: number;
+  status: string;
+  alerts?: number;
+  error?: string;
+}
+
 export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps) {
   const [data, setData] = useState<CommentsResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -26,6 +34,10 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+  const [analyzingCommentId, setAnalyzingCommentId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState('fetched_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const pageSize = 50;
 
@@ -35,6 +47,8 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
+        sortBy,
+        sortOrder,
       });
       if (sourceId) params.set('source_id', String(sourceId));
       if (attentionOnly) params.set('needs_attention', 'true');
@@ -47,35 +61,102 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
     } finally {
       setLoading(false);
     }
-  }, [page, sourceId, attentionOnly, search]);
+  }, [page, sourceId, attentionOnly, search, sortBy, sortOrder]);
 
   useEffect(() => {
     setPage(1);
-  }, [sourceId, attentionOnly, search]);
+  }, [sourceId, attentionOnly, search, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
 
+  function handleSort(column: string) {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder(column === 'likes' ? 'desc' : 'asc');
+    }
+  }
+
   async function handleAnalyze() {
     setAnalyzing(true);
+    setAnalysisProgress({ done: 0, total: 0, status: 'starting' });
+    setAnalyzingCommentId(null);
+    
     try {
-      const body: Record<string, unknown> = {};
-      if (sourceId) body.source_id = sourceId;
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        await fetchComments();
-        onAnalyzeRequest?.();
-      } else {
-        alert(result.error ?? 'Analysis failed');
+      const params = new URLSearchParams();
+      if (sourceId) params.set('source_id', String(sourceId));
+
+      const res = await fetch(`/api/analyze/stream?${params}`);
+      
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.error ?? 'Analysis failed');
+        setAnalyzing(false);
+        setAnalysisProgress(null);
+        return;
       }
-    } finally {
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        alert('Failed to read response');
+        setAnalyzing(false);
+        setAnalysisProgress(null);
+        return;
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              
+              if (event.error) {
+                const errorMsg = event.error.includes('image input') 
+                  ? 'This AI model does not support image analysis. Please try a different model in settings.'
+                  : event.error;
+                setAnalyzing(false);
+                setAnalysisProgress(null);
+                alert(errorMsg);
+                return;
+              }
+
+              setAnalysisProgress({
+                done: event.done,
+                total: event.total,
+                status: event.status,
+                alerts: event.alerts,
+              });
+
+              if (event.status === 'complete') {
+                await fetchComments();
+                onAnalyzeRequest?.();
+                setAnalyzing(false);
+                setTimeout(() => {
+                  setAnalysisProgress(null);
+                  setAnalyzingCommentId(null);
+                }, 1500);
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (err) {
+      alert(String(err));
       setAnalyzing(false);
+      setAnalysisProgress(null);
     }
   }
 
@@ -145,29 +226,110 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
               {data.total.toLocaleString()} comment{data.total !== 1 ? 's' : ''}
             </span>
           )}
+          {analysisProgress && analysisProgress.total > 0 && (
+            <span className="text-sm tabular-nums px-2 py-1 rounded" style={{ background: 'var(--color-info-100)', color: 'var(--color-info-700)' }}>
+              {analysisProgress.done}/{analysisProgress.total} done
+            </span>
+          )}
           <button
             onClick={handleAnalyze}
             disabled={analyzing}
             className="rounded px-3 py-1.5 text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ background: 'var(--color-info-600)' }}
           >
-            {analyzing ? 'Analyzing\u2026' : 'Analyze with AI'}
+            {analyzing ? 'Analyzing...' : 'Analyze with AI'}
           </button>
         </div>
       </div>
+
+      {/* Analysis progress bar */}
+      {analyzing && analysisProgress && analysisProgress.total > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--surface-card)', border: '1px solid var(--color-danger-200)' }}>
+          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-muted)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${(analysisProgress.done / analysisProgress.total) * 100}%`,
+                background: 'var(--color-danger-500)',
+              }}
+            />
+          </div>
+          <span className="text-sm tabular-nums shrink-0" style={{ color: 'var(--color-danger-600)' }}>
+            {analysisProgress.status === 'complete'
+              ? `Done! ${analysisProgress.alerts ?? 0} alerts created`
+              : `${analysisProgress.done} / ${analysisProgress.total}`
+            }
+          </span>
+        </div>
+      )}
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto rounded-lg" style={{ border: '1px solid var(--border-default)' }}>
         <table className="w-full text-sm">
           <thead style={{ background: 'var(--surface-muted)' }}>
             <tr>
-              <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Author</th>
+              <th 
+                className="px-4 py-3 text-left font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => handleSort('author')}
+              >
+                <span className="flex items-center gap-1">
+                  Author
+                  {sortBy === 'author' && (
+                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </span>
+              </th>
               <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Comment</th>
               <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Platform</th>
-              <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Sentiment</th>
-              <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Urgency</th>
-              <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Likes</th>
-              <th className="px-4 py-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Date</th>
+              <th 
+                className="px-4 py-3 text-left font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => handleSort('sentiment')}
+              >
+                <span className="flex items-center gap-1">
+                  Sentiment
+                  {sortBy === 'sentiment' && (
+                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </span>
+              </th>
+              <th 
+                className="px-4 py-3 text-left font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => handleSort('urgency')}
+              >
+                <span className="flex items-center gap-1">
+                  Urgency
+                  {sortBy === 'urgency' && (
+                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </span>
+              </th>
+              <th 
+                className="px-4 py-3 text-left font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => handleSort('likes')}
+              >
+                <span className="flex items-center gap-1">
+                  Likes
+                  {sortBy === 'likes' && (
+                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </span>
+              </th>
+              <th 
+                className="px-4 py-3 text-left font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => handleSort('published_at')}
+              >
+                <span className="flex items-center gap-1">
+                  Date
+                  {sortBy === 'published_at' && (
+                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -190,6 +352,7 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
                   style={{
                     background: comment.needs_attention ? 'var(--color-warning-50)' : undefined,
                   }}
+                  className={analyzing && !comment.analyzed_at ? 'relative' : undefined}
                 >
                   <td className="px-4 py-3 font-medium whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
                     @{comment.author}
@@ -198,6 +361,12 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
                     <p className="line-clamp-2" style={{ color: 'var(--text-primary)' }}>{comment.text}</p>
                     {comment.ai_reason && (
                       <p className="mt-1 text-xs italic" style={{ color: 'var(--color-warning-600)' }}>{comment.ai_reason}</p>
+                    )}
+                    {!comment.analyzed_at && analyzing && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-xs" style={{ color: 'var(--color-info-600)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-info-600)' }} />
+                        Analyzing...
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">

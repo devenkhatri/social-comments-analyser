@@ -18,6 +18,14 @@ function getActorId(platform: Platform): string {
   return DEFAULT_ACTOR_IDS[platform];
 }
 
+type NormalizeFn = (item: Record<string, unknown>) => {
+  external_id: string;
+  author: string;
+  text: string;
+  likes: number;
+  published_at: string | null;
+} | null;
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ platform: string }> }
@@ -39,27 +47,21 @@ export async function POST(
     );
   }
 
-  let inputFn: (url: string) => Record<string, unknown>;
-  let normalizeFn: (item: Record<string, unknown>) => {
-    external_id: string;
-    author: string;
-    text: string;
-    likes: number;
-    published_at: string | null;
-  } | null;
+  let inputFn: (url: string | string[]) => Record<string, unknown>;
+  let normalizeFn: NormalizeFn;
 
   switch (platform) {
     case "instagram":
       inputFn = buildInstagramInput;
-      normalizeFn = normalizeInstagramComment;
+      normalizeFn = normalizeInstagramComment as unknown as NormalizeFn;
       break;
     case "youtube":
       inputFn = buildYouTubeInput;
-      normalizeFn = normalizeYouTubeComment;
+      normalizeFn = normalizeYouTubeComment as unknown as NormalizeFn;
       break;
     case "twitter":
       inputFn = buildTwitterInput;
-      normalizeFn = normalizeTwitterComment;
+      normalizeFn = normalizeTwitterComment as unknown as NormalizeFn;
       break;
     default:
       return Response.json({ error: "Invalid platform" }, { status: 400 });
@@ -69,9 +71,12 @@ export async function POST(
   let totalFetched = 0;
   const errors: string[] = [];
 
+  const urls = sources.map((s) => s.url);
+  const input = inputFn(urls);
+
   for (const source of sources) {
     try {
-      const rawItems = await runApifyActor(getActorId(platform as Platform), inputFn(source.url));
+      const rawItems = await runApifyActor(getActorId(platform as Platform), input);
 
       const insertStmt = db.prepare(`
         INSERT OR IGNORE INTO comments (source_id, external_id, author, text, likes, published_at, fetched_at)

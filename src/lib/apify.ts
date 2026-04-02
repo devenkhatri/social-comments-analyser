@@ -31,7 +31,7 @@ const NORMALIZERS: Record<Platform, NormalizerFn> = {
   twitter: (item) => normalizeTwitterComment(item as Record<string, unknown>),
 };
 
-type InputBuilderFn = (url: string) => Record<string, unknown>;
+type InputBuilderFn = (url: string | string[]) => Record<string, unknown>;
 
 const INPUT_BUILDERS: Record<Platform, InputBuilderFn> = {
   instagram: buildInstagramInput,
@@ -63,12 +63,12 @@ export function detectPlatform(url: string): Platform | null {
  * Timeout is set to 5 minutes, which should be enough for most scraping jobs.
  */
 export async function fetchCommentsFromApify(
-  url: string,
+  urls: string | string[],
   platform: Platform,
   apiToken: string
 ): Promise<RawComment[]> {
   const actorId = getActorId(platform);
-  const input = INPUT_BUILDERS[platform](url);
+  const input = INPUT_BUILDERS[platform](urls);
   const normalizer = NORMALIZERS[platform];
 
   const endpoint = `${APIFY_BASE_URL}/acts/${actorId}/run-sync-get-dataset-items?token=${apiToken}&timeout=300&memory=512`;
