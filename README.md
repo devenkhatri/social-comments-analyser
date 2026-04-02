@@ -17,12 +17,13 @@ A Next.js dashboard application for collecting, analyzing, and managing comments
 - **Real-time Progress** - Live progress bar and counter during AI analysis
 
 ### Dashboard
-- Real-time statistics overview
-- Source management panel
+- Real-time statistics overview (total, needs attention, critical, sentiment breakdown)
+- Collapsible sidebar with source management panel
 - Sortable comments table with filtering, search, and pagination
-- Alert panel for priority items
-- Platform badges and sentiment indicators
-- Dark mode support
+- Alert panel with unresolved alert badge counter
+- Platform badges and sentiment/severity indicators
+- **Light/Dark mode toggle** — persists preference via `localStorage`, respects system preference on first visit
+- Responsive layout with mobile sidebar overlay
 
 ## Tech Stack
 
@@ -102,6 +103,7 @@ The application will be available at [http://localhost:3000](http://localhost:30
 ### Managing Alerts
 
 - Switch to the "Alerts" tab to view priority items
+- An unresolved alert count badge is shown on the Alerts tab
 - Alerts are automatically created for high and critical urgency comments
 - Mark alerts as resolved when addressed
 
@@ -111,6 +113,12 @@ The application will be available at [http://localhost:3000](http://localhost:30
 - Click again to toggle ascending/descending order
 - Use the search box to filter comments by text
 - Toggle "Needs attention only" to see flagged items
+
+### Theme Toggle
+
+- Click the sun/moon icon in the top-right header to switch between light and dark mode
+- Your preference is saved to `localStorage` and restored on next visit
+- Falls back to the OS/system color scheme preference on first visit
 
 ## Project Structure
 
@@ -124,17 +132,18 @@ src/
 │   │   ├── fetch-comments/ # Platform-specific fetching
 │   │   ├── sources/        # Source management
 │   │   └── stats/          # Dashboard statistics
-│   ├── globals.css         # Global styles + design tokens
+│   ├── globals.css         # Global styles + design tokens (light & dark themes)
 │   ├── layout.tsx          # Root layout
 │   └── page.tsx            # Main dashboard
 ├── components/             # React components
 │   ├── AlertPanel.tsx
 │   ├── CommentsTable.tsx   # Sortable table with analysis progress
-│   ├── PlatformBadge.tsx
+│   ├── PlatformBadge.tsx   # Platform color-coded badge (dot or full)
 │   ├── SentimentBadge.tsx
 │   ├── SeverityBadge.tsx
 │   ├── SourcesPanel.tsx
-│   ├── StatsBar.tsx
+│   ├── StatsBar.tsx        # Stats strip with sentiment breakdown
+│   ├── ThemeToggle.tsx     # Light/dark mode toggle button
 │   └── icons/              # SVG icon components
 └── lib/                    # Core libraries
     ├── adapters/           # Platform-specific input/output adapters
@@ -171,12 +180,18 @@ Data is stored in `data/comments.db` (SQLite). The database is automatically cre
 
 ## Recent Changes
 
-- **YouTube adapter updated** - Now supports multiple video URLs with `videosUrls` array, `maxComments: 30`, and `orderBy: 'top'`
-- **Real-time analysis progress** - Streaming SSE endpoint shows live progress bar and done/total counter
-- **Column sorting** - All major columns are now sortable with visual indicators
-- **Auto-refresh** - Comments view refreshes automatically after fetching or analyzing
-- **Deduplication** - Only new comments are stored; duplicates are skipped via unique constraint
-- **Error handling** - User-friendly error messages for AI model limitations
+- **Theme toggle** — New `ThemeToggle` component in the header; switches between light and dark mode, persists to `localStorage`, and respects system preference on first visit
+- **Responsive layout** — Mobile sidebar with overlay and hamburger/close icon toggle; sidebar slides in/out with smooth animation
+- **Alert badge** — Unresolved alert count shown as a badge on the Alerts tab; updates after every analysis run
+- **Stats bar redesign** — Compact metric strip with sentiment breakdown (positive / neutral / negative) inline
+- **Platform badge** — Supports `dotOnly` prop for compact inline display; uses design-token colors
+- **Component redesign** — `AlertPanel`, `CommentsTable`, `SourcesPanel`, `SentimentBadge`, `SeverityBadge` updated to use CSS design tokens for full theme compatibility
+- **Global CSS tokens** — `globals.css` now defines a complete set of light and dark design tokens (`--bg`, `--surface`, `--brand`, `--danger`, `--success`, `--warning`, etc.) toggled via `data-theme` attribute
+- **YouTube adapter** — Supports multiple video URLs with `videosUrls` array, `maxComments: 30`, and `orderBy: 'top'`
+- **Real-time analysis progress** — Streaming SSE endpoint shows live progress bar and done/total counter
+- **Column sorting** — All major columns are sortable with visual indicators
+- **Auto-refresh** — Comments view refreshes automatically after fetching or analyzing
+- **Deduplication** — Only new comments are stored; duplicates are skipped via unique constraint
 
 ## Build for Production
 
