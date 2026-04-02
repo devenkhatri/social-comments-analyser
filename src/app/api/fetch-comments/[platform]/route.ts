@@ -6,11 +6,17 @@ import { buildYouTubeInput, normalizeYouTubeComment } from "@/lib/adapters/youtu
 import { buildTwitterInput, normalizeTwitterComment } from "@/lib/adapters/twitter";
 import { Platform, Source } from "@/lib/types";
 
-const ACTOR_IDS: Record<Platform, string> = {
+const DEFAULT_ACTOR_IDS: Record<Platform, string> = {
   instagram: "apify~instagram-comment-scraper",
-  youtube: "scrapio~youtube-comments-scraper",
+  youtube: "LXCwFkJ18vBfDQuHn",
   twitter: "datapilot~twitter-x-comment-scraper",
 };
+
+function getActorId(platform: Platform): string {
+  const fromEnv = process.env[`APIFY_ACTOR_${platform.toUpperCase()}`];
+  if (fromEnv?.trim()) return fromEnv.trim();
+  return DEFAULT_ACTOR_IDS[platform];
+}
 
 export async function POST(
   _request: NextRequest,
@@ -65,7 +71,7 @@ export async function POST(
 
   for (const source of sources) {
     try {
-      const rawItems = await runApifyActor(ACTOR_IDS[platform as Platform], inputFn(source.url));
+      const rawItems = await runApifyActor(getActorId(platform as Platform), inputFn(source.url));
 
       const insertStmt = db.prepare(`
         INSERT OR IGNORE INTO comments (source_id, external_id, author, text, likes, published_at, fetched_at)

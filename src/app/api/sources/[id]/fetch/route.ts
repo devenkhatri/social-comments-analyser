@@ -10,7 +10,7 @@ export const maxDuration = 300; // Allow up to 5 min for Apify actor runs
 
 const DEFAULT_ACTOR_IDS: Record<Platform, string> = {
   instagram: 'apify~instagram-comment-scraper',
-  youtube: 'scrapio~youtube-comments-scraper',
+  youtube: 'LXCwFkJ18vBfDQuHn',
   twitter: 'datapilot~twitter-x-comment-scraper',
 };
 

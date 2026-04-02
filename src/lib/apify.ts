@@ -8,7 +8,7 @@ const APIFY_BASE_URL = 'https://api.apify.com/v2';
 /** Default actor IDs — can be overridden via env vars. */
 const DEFAULT_ACTOR_IDS: Record<Platform, string> = {
   instagram: 'SbK00X0JYCPblD2wp',
-  youtube: 'mExYO4A2k9976zMfA',
+  youtube: 'LXCwFkJ18vBfDQuHn',
   twitter: 'm2yGezjjPmm4bOvax',
 };
 

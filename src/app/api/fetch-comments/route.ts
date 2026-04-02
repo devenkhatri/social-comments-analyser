@@ -7,7 +7,7 @@ import { Source } from "@/lib/types";
 
 const DEFAULT_ACTOR_IDS: Record<string, string> = {
   instagram: "apify~instagram-comment-scraper",
-  youtube: "scrapio~youtube-comments-scraper",
+  youtube: "LXCwFkJ18vBfDQuHn",
   twitter: "datapilot~twitter-x-comment-scraper",
 };
 
