@@ -6,6 +6,7 @@ import { SourcesPanel } from '@/components/SourcesPanel';
 import { CommentsTable } from '@/components/CommentsTable';
 import { AlertPanel } from '@/components/AlertPanel';
 import { StatsBar } from '@/components/StatsBar';
+import { CloseIcon, MenuIcon } from '@/components/icons';
 
 type Tab = 'comments' | 'alerts';
 
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [alertRefreshKey, setAlertRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>('comments');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchSources = useCallback(async () => {
     try {
@@ -65,23 +67,60 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: 'var(--surface-page)' }}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header style={{ background: 'var(--surface-card)', borderBottom: '1px solid var(--border-default)' }} className="px-4 sm:px-6 py-4">
         <div className="max-w-screen-2xl mx-auto flex items-center gap-4">
-          <h1 className="text-xl font-bold text-gray-900">Comment Monitor</h1>
-          <span className="text-sm text-gray-400">powered by Apify + OpenRouter</span>
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden rounded p-2"
+            style={{ color: 'var(--text-secondary)' }}
+            aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? (
+              <CloseIcon />
+            ) : (
+              <MenuIcon />
+            )}
+          </button>
+          <h1 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Comment Monitor</h1>
+          <span className="text-xs sm:text-sm" style={{ color: 'var(--text-tertiary)' }}>powered by Apify + OpenRouter</span>
         </div>
       </header>
 
-      <main className="max-w-screen-2xl mx-auto px-6 py-6 flex flex-col gap-6">
+      {/* Sidebar overlay on mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
         {/* Stats */}
         <StatsBar stats={stats} />
 
         {/* Main layout */}
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 mt-6">
           {/* Sidebar: Sources */}
-          <aside className="w-72 shrink-0">
+          <aside
+            className={`
+              fixed lg:static inset-y-0 left-0 z-50 w-72
+              transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+              lg:transform-none lg:w-72 lg:shrink-0 lg:z-auto
+              ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+              pt-20 lg:pt-0 px-4 lg:px-0
+            `}
+            style={{
+              background: 'var(--surface-card)',
+              borderRight: '1px solid var(--border-default)',
+              boxShadow: sidebarOpen ? 'var(--shadow-lg)' : 'none',
+            }}
+            aria-label="Sources sidebar"
+          >
             <SourcesPanel
               sources={sources}
               selectedSourceId={selectedSourceId}
@@ -93,24 +132,34 @@ export default function Dashboard() {
           {/* Content area */}
           <div className="flex-1 min-w-0">
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-4">
+            <div role="tablist" className="flex border-b mb-4" style={{ borderColor: 'var(--border-default)' }}>
               <button
+                role="tab"
+                aria-selected={activeTab === 'comments'}
+                aria-controls="panel-comments"
+                id="tab-comments"
+                tabIndex={activeTab === 'comments' ? 0 : -1}
                 onClick={() => setActiveTab('comments')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'comments'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
+                className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+                style={{
+                  borderColor: activeTab === 'comments' ? 'var(--color-brand-600)' : 'transparent',
+                  color: activeTab === 'comments' ? 'var(--color-brand-600)' : 'var(--text-secondary)',
+                }}
               >
                 Comments
               </button>
               <button
+                role="tab"
+                aria-selected={activeTab === 'alerts'}
+                aria-controls="panel-alerts"
+                id="tab-alerts"
+                tabIndex={activeTab === 'alerts' ? 0 : -1}
                 onClick={() => setActiveTab('alerts')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'alerts'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
+                className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+                style={{
+                  borderColor: activeTab === 'alerts' ? 'var(--color-brand-600)' : 'transparent',
+                  color: activeTab === 'alerts' ? 'var(--color-brand-600)' : 'var(--text-secondary)',
+                }}
               >
                 Alerts
               </button>
@@ -118,16 +167,20 @@ export default function Dashboard() {
 
             {/* Tab content */}
             {activeTab === 'comments' ? (
-              <CommentsTable
-                sourceId={selectedSourceId}
-                onAnalyzeRequest={handleAnalyzeDone}
-              />
+              <div role="tabpanel" id="panel-comments" aria-labelledby="tab-comments">
+                <CommentsTable
+                  sourceId={selectedSourceId}
+                  onAnalyzeRequest={handleAnalyzeDone}
+                />
+              </div>
             ) : (
-              <AlertPanel refreshKey={alertRefreshKey} />
+              <div role="tabpanel" id="panel-alerts" aria-labelledby="tab-alerts">
+                <AlertPanel refreshKey={alertRefreshKey} />
+              </div>
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -1,19 +1,162 @@
 @import "tailwindcss";
 
+/* ============================================
+   DESIGN TOKENS
+   ============================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand palette — OKLCH, cool blue-indigo */
+  --color-brand-50:  oklch(97% 0.01 250);
+  --color-brand-100: oklch(93% 0.03 250);
+  --color-brand-200: oklch(87% 0.06 250);
+  --color-brand-300: oklch(78% 0.09 250);
+  --color-brand-400: oklch(68% 0.12 250);
+  --color-brand-500: oklch(58% 0.14 250);
+  --color-brand-600: oklch(50% 0.14 250);
+  --color-brand-700: oklch(42% 0.12 250);
+  --color-brand-800: oklch(35% 0.10 250);
+  --color-brand-900: oklch(28% 0.08 250);
+  --color-brand-950: oklch(20% 0.06 250);
+
+  /* Tinted neutrals — cool brand hint */
+  --gray-50:  oklch(98% 0.003 250);
+  --gray-100: oklch(95% 0.005 250);
+  --gray-200: oklch(90% 0.007 250);
+  --gray-300: oklch(83% 0.008 250);
+  --gray-400: oklch(65% 0.010 250);
+  --gray-500: oklch(52% 0.010 250);
+  --gray-600: oklch(44% 0.010 250);
+  --gray-700: oklch(37% 0.010 250);
+  --gray-800: oklch(28% 0.008 250);
+  --gray-900: oklch(20% 0.006 250);
+  --gray-950: oklch(14% 0.004 250);
+
+  /* Semantic colors */
+  --color-success-50:  oklch(97% 0.02 150);
+  --color-success-100: oklch(93% 0.04 150);
+  --color-success-600: oklch(50% 0.12 150);
+  --color-success-700: oklch(42% 0.10 150);
+
+  --color-warning-50:  oklch(97% 0.02 85);
+  --color-warning-100: oklch(94% 0.05 85);
+  --color-warning-200: oklch(89% 0.08 85);
+  --color-warning-600: oklch(55% 0.12 85);
+  --color-warning-700: oklch(47% 0.11 85);
+
+  --color-danger-50:  oklch(97% 0.02 25);
+  --color-danger-100: oklch(94% 0.04 25);
+  --color-danger-600: oklch(52% 0.14 25);
+  --color-danger-700: oklch(44% 0.12 25);
+
+  --color-info-50:  oklch(97% 0.01 270);
+  --color-info-100: oklch(94% 0.03 270);
+  --color-info-600: oklch(50% 0.12 270);
+
+  /* Surfaces */
+  --surface-page: var(--gray-50);
+  --surface-card: oklch(100% 0 0);
+  --surface-elevated: var(--gray-100);
+  --surface-muted: var(--gray-100);
+
+  /* Text */
+  --text-primary: var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-400);
+  --text-on-brand: oklch(99% 0.003 250);
+  --text-link: var(--color-brand-600);
+
+  /* Borders */
+  --border-default: var(--gray-200);
+  --border-subtle: var(--gray-100);
+
+  /* Focus ring */
+  --ring-color: var(--color-brand-500);
+  --ring-offset: 2px;
+
+  /* Motion */
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.05);
+  --shadow-md: 0 2px 8px oklch(0% 0 0 / 0.08);
+  --shadow-lg: 0 4px 16px oklch(0% 0 0 / 0.10);
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
 }
 
+/* ============================================
+   DARK MODE
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-page: var(--gray-950);
+    --surface-card: var(--gray-900);
+    --surface-elevated: var(--gray-800);
+    --surface-muted: var(--gray-800);
+
+    --text-primary: var(--gray-100);
+    --text-secondary: var(--gray-400);
+    --text-tertiary: var(--gray-500);
+    --text-on-brand: var(--gray-100);
+    --text-link: var(--color-brand-400);
+
+    --border-default: var(--gray-700);
+    --border-subtle: var(--gray-800);
+
+    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.2);
+    --shadow-md: 0 2px 8px oklch(0% 0 0 / 0.3);
+    --shadow-lg: 0 4px 16px oklch(0% 0 0 / 0.4);
+  }
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--surface-page);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface-page);
+  color: var(--text-primary);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   FOCUS STYLES
+   ============================================ */
+
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
