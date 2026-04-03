@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Source } from '@/lib/types';
 import { PlatformBadge } from './PlatformBadge';
-import { RefreshIcon, TrashIcon, SpinnerIcon } from './icons';
+import { RefreshIcon, TrashIcon, SpinnerIcon, EditIcon } from './icons';
 
 interface SourcesPanelProps {
   sources: Source[];
@@ -60,6 +60,11 @@ export function SourcesPanel({
   const [adding, setAdding] = useState(false);
   const [fetchingId, setFetchingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingSource, setEditingSource] = useState<Source | null>(null);
+  const [editUrl, setEditUrl] = useState('');
+  const [editLabel, setEditLabel] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,6 +75,47 @@ export function SourcesPanel({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [deletingId]);
+
+  useEffect(() => {
+    if (editingSource === null) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setEditingSource(null);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingSource]);
+
+  function openEdit(source: Source) {
+    setEditingSource(source);
+    setEditUrl(source.url);
+    setEditLabel(source.label ?? '');
+    setEditError(null);
+  }
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingSource || !editUrl.trim()) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/sources/${editingSource.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: editUrl.trim(), label: editLabel.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error ?? 'Failed to save');
+      } else {
+        setEditingSource(null);
+        onSourcesChanged();
+      }
+    } catch (err) {
+      setEditError(String(err));
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -287,6 +333,25 @@ export function SourcesPanel({
                   {/* Actions */}
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-0.5 shrink-0">
                     <button
+                      onClick={(e) => { e.stopPropagation(); openEdit(source); }}
+                      title="Edit source"
+                      aria-label={`Edit ${source.label || source.url}`}
+                      style={{
+                        width: 26, height: 26,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 'var(--r-sm)',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--t3)',
+                        cursor: 'pointer',
+                        transition: 'color var(--dur-fast), background var(--dur-fast)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t1)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--t3)'; }}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleFetch(source.id); }}
                       disabled={fetchingId === source.id}
                       title="Sync comments"
@@ -333,6 +398,112 @@ export function SourcesPanel({
           </ul>
         )}
       </div>
+
+      {/* Edit dialog */}
+      {editingSource !== null && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            style={{ background: 'oklch(0% 0 0 / 0.45)' }}
+            onClick={() => setEditingSource(null)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-source-title"
+            className="fixed inset-x-4 z-50 mx-auto max-w-sm"
+            style={{
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              boxShadow: 'var(--shadow-lg)',
+              padding: 20,
+            }}
+          >
+            <h3 id="edit-source-title" style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)', marginBottom: 14 }}>
+              Edit Source
+            </h3>
+            <form onSubmit={handleEditSave} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--t2)' }}>URL</label>
+                <input
+                  type="url"
+                  value={editUrl}
+                  onChange={e => setEditUrl(e.target.value)}
+                  required
+                  style={INPUT_STYLE}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--t2)' }}>
+                  Label <span style={{ color: 'var(--t4)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={editLabel}
+                  onChange={e => setEditLabel(e.target.value)}
+                  placeholder="e.g. Brand campaign video"
+                  style={INPUT_STYLE}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+              </div>
+              {editError && (
+                <div style={{
+                  padding: '7px 10px',
+                  borderRadius: 'var(--r-md)',
+                  background: 'var(--danger-subtle)',
+                  border: '1px solid var(--danger-border)',
+                  color: 'var(--danger-text)',
+                  fontSize: 12,
+                }}>
+                  {editError}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingSource(null)}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    borderRadius: 'var(--r-md)',
+                    border: '1px solid var(--border)',
+                    background: 'transparent',
+                    color: 'var(--t2)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 'var(--r-md)',
+                    border: 'none',
+                    background: 'var(--brand)',
+                    color: 'var(--t-brand)',
+                    cursor: editSaving ? 'not-allowed' : 'pointer',
+                    opacity: editSaving ? 0.6 : 1,
+                  }}
+                >
+                  {editSaving ? 'Saving\u2026' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
 
       {/* Delete confirmation */}
       {deletingId !== null && (

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Comment, CommentsResponse } from '@/lib/types';
 import { PlatformBadge } from './PlatformBadge';
 import { SentimentBadge } from './SentimentBadge';
-import { SpinnerIcon } from './icons';
+import { SpinnerIcon, CloseIcon } from './icons';
 
 const URGENCY_STYLE: Record<string, React.CSSProperties> = {
   critical: { background: 'var(--danger-subtle)', boxShadow: 'inset 3px 0 0 var(--danger)' },
@@ -44,6 +44,7 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
   const [data, setData] = useState<CommentsResponse | null>(null);
   const [page, setPage] = useState(1);
   const [attentionOnly, setAttentionOnly] = useState(false);
+  const [hideAnalyzed, setHideAnalyzed] = useState(false);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,8 +52,18 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const [sortBy, setSortBy] = useState('fetched_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
 
   const pageSize = 50;
+
+  useEffect(() => {
+    if (!selectedComment) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelectedComment(null);
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [selectedComment]);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -60,15 +71,16 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sortBy, sortOrder });
       if (sourceId) params.set('source_id', String(sourceId));
       if (attentionOnly) params.set('needs_attention', 'true');
+      if (hideAnalyzed) params.set('analyzed', 'false');
       if (search) params.set('search', search);
       const res = await fetch(`/api/comments?${params}`);
       if (res.ok) setData(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [page, sourceId, attentionOnly, search, sortBy, sortOrder]);
+  }, [page, sourceId, attentionOnly, hideAnalyzed, search, sortBy, sortOrder]);
 
-  useEffect(() => { setPage(1); }, [sourceId, attentionOnly, search, sortBy, sortOrder]);
+  useEffect(() => { setPage(1); }, [sourceId, attentionOnly, hideAnalyzed, search, sortBy, sortOrder]);
   useEffect(() => { fetchComments(); }, [fetchComments]);
 
   function handleSort(column: string) {
@@ -110,6 +122,13 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
                   ? 'This AI model does not support image analysis. Try a different model.'
                   : event.error;
                 setAnalyzing(false); setAnalysisProgress(null); alert(errorMsg); return;
+              }
+              // Handle "nothing to analyze" case
+              if (event.total === 0) {
+                setAnalyzing(false);
+                setAnalysisProgress({ done: 0, total: 0, status: 'complete', alerts: 0 });
+                setTimeout(() => setAnalysisProgress(null), 2000);
+                return;
               }
               setAnalysisProgress({ done: event.done, total: event.total, status: event.status, alerts: event.alerts });
               if (event.status === 'complete') {
@@ -214,6 +233,17 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
           Needs attention
         </label>
 
+        {/* Hide analyzed filter */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--t2)', cursor: 'pointer', userSelect: 'none' }}>
+          <input
+            type="checkbox"
+            checked={hideAnalyzed}
+            onChange={(e) => setHideAnalyzed(e.target.checked)}
+            style={{ accentColor: 'var(--brand)', width: 14, height: 14, cursor: 'pointer' }}
+          />
+          Hide analyzed
+        </label>
+
         {/* Right: count + analyze */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           {data && (
@@ -283,7 +313,9 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
             fontVariantNumeric: 'tabular-nums',
           }}>
             {analysisProgress.status === 'complete'
-              ? `Done \u00b7 ${analysisProgress.alerts ?? 0} alert${analysisProgress.alerts !== 1 ? 's' : ''} created`
+              ? (analysisProgress.total === 0
+                  ? 'All comments already analyzed'
+                  : `Done \u00b7 ${analysisProgress.alerts ?? 0} alert${analysisProgress.alerts !== 1 ? 's' : ''} created`)
               : `Analyzing ${analysisProgress.done} of ${analysisProgress.total}`
             }
           </span>
@@ -339,21 +371,29 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
               <tr>
                 <td colSpan={7} style={{ padding: '48px 14px', textAlign: 'center' }}>
                   <p style={{ color: 'var(--t3)', fontSize: 13 }}>
-                    {search || attentionOnly ? 'No comments match your filters.' : 'No comments yet. Add a source and fetch comments to get started.'}
+                    {search || attentionOnly || hideAnalyzed ? 'No comments match your filters.' : 'No comments yet. Add a source and fetch comments to get started.'}
                   </p>
                 </td>
               </tr>
             ) : (
               data?.comments.map((comment: Comment) => {
                 const urgencyStyle = URGENCY_STYLE[comment.urgency ?? ''] ?? {};
+                const needsAttentionStyle: React.CSSProperties = comment.needs_attention
+                  ? { background: 'var(--warning-subtle)', boxShadow: 'inset 3px 0 0 var(--warning)' }
+                  : {};
                 return (
                   <tr
                     key={comment.id}
+                    onClick={() => setSelectedComment(comment)}
                     style={{
                       borderTop: '1px solid var(--border-subtle)',
+                      ...needsAttentionStyle,
                       ...urgencyStyle,
                       transition: 'background var(--dur-fast)',
+                      cursor: 'pointer',
                     }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.filter = 'brightness(0.97)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.filter = ''; }}
                   >
                     <td style={{ padding: '10px 14px', fontWeight: 500, color: 'var(--t1)', whiteSpace: 'nowrap', fontSize: 13 }}>
                       <span style={{ color: 'var(--t3)', fontSize: 11 }}>@</span>{comment.author}
@@ -432,14 +472,16 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
             return (
               <div
                 key={comment.id}
+                onClick={() => setSelectedComment(comment)}
                 style={{
                   padding: '12px 14px',
                   borderRadius: 'var(--r-lg)',
-                  border: '1px solid var(--border)',
+                  border: comment.needs_attention ? '1px solid var(--warning)' : '1px solid var(--border)',
                   background: 'var(--surface)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 8,
+                  cursor: 'pointer',
                   ...urgencyStyle,
                 }}
               >
@@ -512,6 +554,147 @@ export function CommentsTable({ sourceId, onAnalyzeRequest }: CommentsTableProps
             Next {'\u2192'}
           </button>
         </div>
+      )}
+
+      {/* Comment detail dialog */}
+      {selectedComment && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            style={{ background: 'oklch(0% 0 0 / 0.5)' }}
+            onClick={() => setSelectedComment(null)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Comment detail"
+            className="fixed inset-x-4 z-50 mx-auto max-w-lg"
+            style={{
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              boxShadow: 'var(--shadow-lg)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              maxHeight: '85dvh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Dialog header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)' }}>
+                  <span style={{ color: 'var(--t3)', fontWeight: 400 }}>@</span>{selectedComment.author}
+                </span>
+                {selectedComment.platform && <PlatformBadge platform={selectedComment.platform} />}
+                {selectedComment.needs_attention && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', padding: '2px 7px',
+                    borderRadius: 'var(--r-sm)', fontSize: 11, fontWeight: 600,
+                    background: 'var(--warning-muted)', color: 'var(--warning-text)',
+                  }}>
+                    Needs attention
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedComment(null)}
+                aria-label="Close"
+                style={{
+                  width: 28, height: 28, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
+                  background: 'transparent',
+                  color: 'var(--t3)',
+                  cursor: 'pointer',
+                }}
+              >
+                <CloseIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Full comment text */}
+            <p style={{
+              fontSize: 14,
+              color: 'var(--t1)',
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              padding: '12px 14px',
+              background: 'var(--surface-2)',
+              borderRadius: 'var(--r-md)',
+              border: '1px solid var(--border-subtle)',
+            }}>
+              {selectedComment.text}
+            </p>
+
+            {/* AI analysis */}
+            {selectedComment.analyzed_at && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  AI Analysis
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <SentimentBadge sentiment={selectedComment.sentiment} />
+                  {selectedComment.urgency && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', padding: '2px 7px',
+                      borderRadius: 'var(--r-sm)', fontSize: 11,
+                      ...URGENCY_BADGE[selectedComment.urgency],
+                    }}>
+                      {selectedComment.urgency}
+                    </span>
+                  )}
+                  {selectedComment.intent && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', padding: '2px 7px',
+                      borderRadius: 'var(--r-sm)', fontSize: 11,
+                      background: 'var(--surface-2)', color: 'var(--t2)',
+                    }}>
+                      {selectedComment.intent}
+                    </span>
+                  )}
+                </div>
+                {selectedComment.ai_reason && (
+                  <p style={{ fontSize: 13, color: 'var(--warning-text)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                    {selectedComment.ai_reason}
+                  </p>
+                )}
+              </div>
+            )}
+            {!selectedComment.analyzed_at && (
+              <p style={{ fontSize: 12, color: 'var(--t4)', fontStyle: 'italic' }}>Not yet analyzed</p>
+            )}
+
+            {/* Metadata */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
+              {selectedComment.source_label && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Source</p>
+                  <p style={{ fontSize: 12, color: 'var(--t2)' }}>{selectedComment.source_label}</p>
+                </div>
+              )}
+              {selectedComment.published_at && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Published</p>
+                  <p style={{ fontSize: 12, color: 'var(--t2)' }}>{new Date(selectedComment.published_at).toLocaleString()}</p>
+                </div>
+              )}
+              {selectedComment.likes > 0 && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Likes</p>
+                  <p style={{ fontSize: 12, color: 'var(--t2)' }}>{selectedComment.likes.toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

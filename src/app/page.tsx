@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [alertRefreshKey, setAlertRefreshKey] = useState(0);
   const [commentsRefreshKey, setCommentsRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>('comments');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [unresolvedAlerts, setUnresolvedAlerts] = useState(0);
 
   const fetchSources = useCallback(async () => {
@@ -131,9 +131,8 @@ export default function Dashboard() {
           alignItems: 'center',
           gap: 16,
         }}>
-          {/* Mobile menu */}
+          {/* Sidebar toggle */}
           <button
-            className="lg:hidden"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
             style={{
@@ -218,13 +217,21 @@ export default function Dashboard() {
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Sidebar */}
+        {/* Desktop sidebar spacer — controls layout space without duplicating content */}
+        <div
+          className="hidden lg:block flex-shrink-0 overflow-hidden"
+          style={{
+            width: sidebarOpen ? 'var(--sidebar-w)' : 0,
+            transition: 'width 260ms cubic-bezier(0.16,1,0.3,1)',
+          }}
+        />
+
+        {/* Sidebar — fixed on mobile overlay, fixed on desktop aligned to spacer */}
         <aside
           className={`
-            fixed lg:static inset-y-0 left-0 z-50
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            fixed inset-y-0 left-0 z-50
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             transition-transform duration-[260ms] ease-[cubic-bezier(0.16,1,0.3,1)]
-            lg:transition-none
           `}
           style={{
             width: 'var(--sidebar-w)',

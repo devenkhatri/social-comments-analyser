@@ -18,8 +18,10 @@ A Next.js dashboard application for collecting, analyzing, and managing comments
 
 ### Dashboard
 - Real-time statistics overview (total, needs attention, critical, sentiment breakdown)
-- Collapsible sidebar with source management panel
+- Collapsible sidebar with source management panel — toggleable via hamburger button at all screen sizes
 - Sortable comments table with filtering, search, and pagination
+- **Comment detail dialog** — click any comment to view full text, AI analysis, and metadata
+- **"Needs attention" highlighting** — amber border and background on flagged rows; critical urgency overrides to red
 - Alert panel with unresolved alert badge counter
 - Platform badges and sentiment/severity indicators
 - **Light/Dark mode toggle** — persists preference via `localStorage`, respects system preference on first visit
@@ -87,6 +89,13 @@ The application will be available at [http://localhost:3000](http://localhost:30
 2. Add an optional label for easy identification
 3. Click "Add Source" to save
 
+### Editing a Source
+
+1. Hover over any source in the sidebar to reveal the action icons
+2. Click the pencil icon to open the edit dialog
+3. Update the URL and/or label, then click "Save"
+4. The platform is automatically re-detected from the new URL
+
 ### Fetching Comments
 
 1. Click the refresh icon next to any source to fetch new comments
@@ -95,10 +104,11 @@ The application will be available at [http://localhost:3000](http://localhost:30
 
 ### Analyzing Comments
 
-1. Click "Analyze with AI" to run AI analysis on unanalyzed comments
+1. Click "Analyze with AI" to run AI analysis — only unanalyzed comments are processed
 2. Watch real-time progress with a live progress bar and done/total counter
-3. The system classifies sentiment, intent, and urgency
-4. Comments flagged as high/critical urgency automatically generate alerts
+3. If all comments are already analyzed, "All comments already analyzed" is shown briefly
+4. The system classifies sentiment, intent, and urgency
+5. Comments flagged as high/critical urgency automatically generate alerts
 
 ### Managing Alerts
 
@@ -112,7 +122,14 @@ The application will be available at [http://localhost:3000](http://localhost:30
 - Click any column header (Author, Sentiment, Urgency, Likes, Date) to sort
 - Click again to toggle ascending/descending order
 - Use the search box to filter comments by text
-- Toggle "Needs attention only" to see flagged items
+- Toggle **"Needs attention"** to show only flagged comments
+- Toggle **"Hide analyzed"** to show only comments that have not yet been analyzed
+
+### Viewing a Comment
+
+- Click any row in the comments table (or any card on mobile) to open the detail dialog
+- The dialog shows the full untruncated comment text, AI analysis badges (sentiment, urgency, intent), the AI reason, and metadata (source, published date, likes)
+- Close with the ✕ button, backdrop click, or Escape key
 
 ### Theme Toggle
 
@@ -161,10 +178,10 @@ src/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/sources` | GET, POST | List/add sources |
-| `/api/sources/[id]` | GET, DELETE | Get/delete source |
+| `/api/sources/[id]` | GET, PATCH, DELETE | Get/update (label + URL)/delete source |
 | `/api/sources/[id]/fetch` | POST | Fetch comments for a single source |
 | `/api/fetch-comments/[platform]` | POST | Fetch comments for all sources of a platform |
-| `/api/comments` | GET | List comments with sorting, filtering, pagination |
+| `/api/comments` | GET | List comments with sorting, filtering (`analyzed`, `needs_attention`, `search`), pagination |
 | `/api/analyze` | POST | Run AI analysis (legacy, batch) |
 | `/api/analyze/stream` | GET | Run AI analysis with real-time SSE progress |
 | `/api/alerts` | GET, PATCH | List/resolve alerts |
@@ -180,8 +197,13 @@ Data is stored in `data/comments.db` (SQLite). The database is automatically cre
 
 ## Recent Changes
 
+- **Sidebar toggle on all screen sizes** — Hamburger button is now always visible; clicking it collapses/expands the sidebar on both desktop and mobile. Desktop uses a smooth width animation; mobile uses a slide overlay
+- **Edit source** — Pencil icon appears on hover for each source; opens a dialog to update the URL and/or label. Platform is re-detected automatically from the new URL
+- **Comment detail dialog** — Click any comment row or mobile card to open a modal with the full text, all AI analysis badges, AI reason, and metadata. Closes via ✕, backdrop click, or Escape
+- **"Needs attention" highlighting** — Rows/cards with `needs_attention = true` get an amber left-border accent and background; critical urgency overrides with red (more severe)
+- **Analyze only unanalyzed** — "Analyze with AI" already skipped analyzed records; fixed a bug that left the button stuck in loading state when there was nothing to analyze. Now shows "All comments already analyzed" briefly
+- **"Hide analyzed" filter** — New checkbox in the toolbar; when checked, only unanalyzed comments are shown. Backed by a new `analyzed` query param on `GET /api/comments`
 - **Theme toggle** — New `ThemeToggle` component in the header; switches between light and dark mode, persists to `localStorage`, and respects system preference on first visit
-- **Responsive layout** — Mobile sidebar with overlay and hamburger/close icon toggle; sidebar slides in/out with smooth animation
 - **Alert badge** — Unresolved alert count shown as a badge on the Alerts tab; updates after every analysis run
 - **Stats bar redesign** — Compact metric strip with sentiment breakdown (positive / neutral / negative) inline
 - **Platform badge** — Supports `dotOnly` prop for compact inline display; uses design-token colors

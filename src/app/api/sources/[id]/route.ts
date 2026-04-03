@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
+import { detectPlatform } from '@/lib/apify';
 import { Source } from '@/lib/types';
 
 // GET /api/sources/[id]
@@ -20,7 +21,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/sources/[id] - update label
+// PATCH /api/sources/[id] - update label and/or url
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -28,16 +29,36 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { label } = body as { label?: string };
+    const { label, url } = body as { label?: string; url?: string };
 
     const db = getDb();
-    const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(Number(id));
+    const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(Number(id)) as Source | undefined;
     if (!source) {
       return Response.json({ error: 'Source not found' }, { status: 404 });
     }
 
-    db.prepare('UPDATE sources SET label = ? WHERE id = ?').run(
-      (label ?? '').trim(),
+    let newUrl = source.url;
+    let newPlatform = source.platform;
+
+    if (url && url.trim() !== source.url) {
+      newUrl = url.trim();
+      const detected = detectPlatform(newUrl);
+      if (!detected) {
+        return Response.json({ error: 'URL must be from Instagram, YouTube, or X/Twitter' }, { status: 400 });
+      }
+      newPlatform = detected;
+      const duplicate = db.prepare('SELECT id FROM sources WHERE url = ? AND id != ?').get(newUrl, Number(id));
+      if (duplicate) {
+        return Response.json({ error: 'This URL is already being tracked' }, { status: 409 });
+      }
+    }
+
+    const newLabel = label !== undefined ? label.trim() : source.label ?? '';
+
+    db.prepare('UPDATE sources SET url = ?, platform = ?, label = ? WHERE id = ?').run(
+      newUrl,
+      newPlatform,
+      newLabel,
       Number(id)
     );
 

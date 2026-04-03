@@ -46,3 +46,4 @@ Tables: `sources`, `comments` (deduplicated by `source_id+external_id`), `alerts
 - `analyzeBatch()` uses `concurrency=3`; chunks of 1 fall back to single-comment mode instead of batch prompt
 - `maxDuration = 300` is set on the analyze route for Vercel serverless timeout
 - Comments use `INSERT OR IGNORE` with `UNIQUE(source_id, external_id)` for deduplication
+- Update README.md with new changes/features/commands/environment variables as they're added

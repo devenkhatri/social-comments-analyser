@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
 
     const source_id = sp.get('source_id');
     const needs_attention = sp.get('needs_attention');
+    const analyzed = sp.get('analyzed'); // 'true' | 'false' | null
     const sentiment = sp.get('sentiment');
     const urgency = sp.get('urgency');
     const search = sp.get('search');
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest) {
     }
     if (needs_attention === 'true') {
       conditions.push('c.needs_attention = 1');
+    }
+    if (analyzed === 'true') {
+      conditions.push('c.analyzed_at IS NOT NULL');
+    } else if (analyzed === 'false') {
+      conditions.push('c.analyzed_at IS NULL');
     }
     if (sentiment && ['positive', 'negative', 'neutral'].includes(sentiment)) {
       conditions.push('c.sentiment = ?');
